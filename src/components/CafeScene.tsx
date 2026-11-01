@@ -14,7 +14,7 @@ const LOOK_SPEED = 0.008; // radians of camera turn per dragged px
 const TURN = 12;
 type PE = import("react").PointerEvent<HTMLDivElement>;
 
-type Ctl = { input: Vec; fast: boolean; wave: number; pos: Vec; vel: Vec; yaw: number; camYaw: number };
+type Ctl = { input: Vec; fast: boolean; wave: number; pos: Vec; vel: Vec; yaw: number; camYaw: number; looking?: boolean };
 
 function clampToRoom(p: Vec): Vec {
   let { x, y } = p;
@@ -39,6 +39,7 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     c.vel = next.velocity;
     c.pos = clampToRoom({ x: next.position.x, y: next.position.y });
     const speed = Math.hypot(c.vel.x, c.vel.y);
+    if (speed > 15 && !c.looking) { const behind = c.yaw + Math.PI; c.camYaw += Math.atan2(Math.sin(behind - c.camYaw), Math.cos(behind - c.camYaw)) * (1 - Math.exp(-2 * dt)); }
     if (speed > 15) { const target = Math.atan2(c.vel.x, c.vel.y); c.yaw += Math.atan2(Math.sin(target - c.yaw), Math.cos(target - c.yaw)) * (1 - Math.exp(-TURN * dt)); }
     const g = group.current!;
     g.position.set(c.pos.x * UNIT, 0, c.pos.y * UNIT);
@@ -122,8 +123,9 @@ export function CafeScene() {
   }
   function onDown(e: PE) {
     e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.isPrimary) { move.current = null; look.current = null; ctl.current.looking = false; }
     if (!move.current) { move.current = { id: e.pointerId, ox: e.clientX, oy: e.clientY }; showStick(e.clientX, e.clientY, 0, 0, true); }
-    else if (!look.current) look.current = { id: e.pointerId, x: e.clientX };
+    else { look.current = { id: e.pointerId, x: e.clientX }; ctl.current.looking = true; }
   }
   function onMove(e: PE) {
     const m = move.current, l = look.current;
@@ -136,7 +138,7 @@ export function CafeScene() {
   }
   function onUp(e: PE) {
     if (move.current?.id === e.pointerId) { move.current = null; ctl.current.input = { x: 0, y: 0 }; showStick(0, 0, 0, 0, false); }
-    if (look.current?.id === e.pointerId) look.current = null;
+    if (look.current?.id === e.pointerId) { look.current = null; ctl.current.looking = false; }
   }
   useEffect(() => {
     const keys = new Set<string>();
