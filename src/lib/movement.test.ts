@@ -15,4 +15,15 @@ describe("social walking", () => {
     const camera = zoomAt({ x: 10, y: 20 }, 1, 2, { x: 100, y: 80 });
     expect((110 - camera.x) * 2).toBe(100); expect((100 - camera.y) * 2).toBe(80);
   });
+  it("leaves a light drag still at low sensitivity but walks it at high sensitivity", () => {
+    expect(analogInput(scaleInput({ x: 0.2, y: 0 }, 0.4))).toEqual({ x: 0, y: 0 });
+    expect(analogInput(scaleInput({ x: 0.2, y: 0 }, 2)).x).toBeGreaterThan(0);
+  });
+  it("keeps the sensitivity slider inside its limits", () => {
+    expect(clampSensitivity(9)).toBe(2); expect(clampSensitivity(0)).toBe(0.4); expect(clampSensitivity(Number.NaN)).toBe(1);
+  });
+  it("turns toward the drag faster the higher the sensitivity", () => {
+    expect(turnRate(2)).toBeGreaterThan(turnRate(0.4));
+    expect(scaleInput({ x: 1, y: 0 }, 0.5)).toEqual({ x: 0.5, y: 0 });
+  });
 });
