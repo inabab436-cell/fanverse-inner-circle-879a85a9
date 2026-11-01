@@ -163,7 +163,7 @@ export function CafeScene() {
         <ContactShadows position={[0, 0.01, 0]} opacity={0.35} scale={12} blur={2} far={3} />
         <Suspense fallback={null}><Avatar ctl={ctl} /></Suspense>
       </Canvas>
-      <header className="movement-header pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-5 pt-5">
+      <header className="movement-header pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-5 pt-5">
         <div>
           <h1 dir="ltr" className="text-3xl font-extrabold text-primary">orbit<span className="text-accent">.</span></h1>
           <p className="mt-1 text-xs text-muted-foreground">المقهى · امشِ حول الطاولة</p>
