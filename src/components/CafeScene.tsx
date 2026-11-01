@@ -110,6 +110,38 @@ function Room() {
 export function CafeScene() {
   const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 120, y: 260 }, vel: { x: 0, y: 0 }, yaw: 0, camYaw: 0 });
   const look = useRef<{ id: number; x: number } | null>(null);
+  const move = useRef<{ id: number; ox: number; oy: number } | null>(null);
+  const base = useRef<HTMLDivElement>(null);
+  const knob = useRef<HTMLDivElement>(null);
+  const R = 60;
+  function showStick(ox: number, oy: number, dx: number, dy: number, on: boolean) {
+    const b = base.current, k = knob.current; if (!b || !k) return;
+    b.style.opacity = on ? "1" : "0"; b.style.transform = `translate(${ox - R}px, ${oy - R}px)`;
+    k.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (!move.current && (!look.current || true) && (move.current === null && (look.current === null || look.current.id !== e.pointerId)) && !(look.current === null && e.pointerType === "mouse" && e.button === 2)) {
+      if (!move.current && (look.current || e.clientX < window.innerWidth / 2 || look.current === null)) {
+        if (!move.current && !(look.current === null && move.current)) { /* first finger walks */ }
+      }
+    }
+    if (!move.current) { move.current = { id: e.pointerId, ox: e.clientX, oy: e.clientY }; showStick(e.clientX, e.clientY, 0, 0, true); }
+    else if (!look.current) look.current = { id: e.pointerId, x: e.clientX };
+  }
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    const m = move.current, l = look.current;
+    if (m && m.id === e.pointerId) {
+      let dx = e.clientX - m.ox, dy = e.clientY - m.oy; const d = Math.hypot(dx, dy);
+      if (d > R) { dx *= R / d; dy *= R / d; }
+      ctl.current.input = analogInput({ x: dx / R, y: dy / R });
+      showStick(m.ox, m.oy, dx, dy, true);
+    } else if (l && l.id === e.pointerId) { ctl.current.camYaw -= (e.clientX - l.x) * LOOK_SPEED; l.x = e.clientX; }
+  }
+  function onUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (move.current?.id === e.pointerId) { move.current = null; ctl.current.input = { x: 0, y: 0 }; showStick(0, 0, 0, 0, false); }
+    if (look.current?.id === e.pointerId) look.current = null;
+  }
   const stickRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const keys = new Set<string>();
@@ -123,15 +155,7 @@ export function CafeScene() {
     const up = (e: KeyboardEvent) => { keys.delete(e.code); sync(); };
     const blur = () => { keys.clear(); sync(); };
     window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", blur);
-    let destroy: (() => void) | undefined; let disposed = false;
-    import("nipplejs").then(({ create }) => {
-      if (disposed || !stickRef.current) return;
-      const j = create({ zone: stickRef.current, mode: "dynamic", size: 120, fadeTime: 120, color: { front: "var(--primary)", back: "var(--secondary)" } });
-      j.on("move", (ev) => { ctl.current.input = analogInput({ x: ev.data.vector.x, y: -ev.data.vector.y }); });
-      j.on("end", () => { ctl.current.input = { x: 0, y: 0 }; });
-      destroy = () => j.destroy();
-    });
-    return () => { disposed = true; destroy?.(); window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", blur); };
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", blur); };
   }, []);
 
   return (
@@ -155,12 +179,9 @@ export function CafeScene() {
           <p className="mt-1 text-xs text-muted-foreground">المقهى · امشِ حول الطاولة</p>
         </div>
       </header>
-      <div ref={stickRef} className="absolute inset-y-0 left-0 w-1/2 touch-none" aria-label="اسحب هنا للمشي" />
-      <div className="absolute inset-y-0 right-0 w-1/2 touch-none" aria-label="اسحب هنا لتدوير الاتجاه"
-        onPointerDown={(e) => { look.current = { id: e.pointerId, x: e.clientX }; e.currentTarget.setPointerCapture(e.pointerId); }}
-        onPointerMove={(e) => { const l = look.current; if (!l || l.id !== e.pointerId) return; ctl.current.camYaw -= (e.clientX - l.x) * LOOK_SPEED; l.x = e.clientX; }}
-        onPointerUp={() => { look.current = null; }} onPointerCancel={() => { look.current = null; }} />
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-around text-xs text-muted-foreground"><span>⬅ يسار: اسحب للمشي</span><span>يمين: اسحب للالتفات ➡</span></div>
+      <div className="absolute inset-0 touch-none select-none" aria-label="إصبع للمشي وإصبع ثانٍ للالتفات" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+      <div ref={base} className="pointer-events-none absolute left-0 top-0 z-10 flex h-[120px] w-[120px] items-center justify-center rounded-full border-2 border-primary/40 bg-secondary/40 opacity-0 transition-opacity"><div ref={knob} className="h-12 w-12 rounded-full bg-primary/80 shadow-soft" /></div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-around text-xs text-muted-foreground"><span>إصبع: اسحب للمشي · إصبع ثانٍ: اسحب للالتفات</span></div>
       <Button variant="outline" className="movement-actions absolute bottom-8 right-6 z-10 h-14 w-14 rounded-full border-2 bg-card text-primary" aria-label="تلويح" onClick={() => { ctl.current.wave = 2; }}><Hand className="size-6" /></Button>
     </div>
   );
