@@ -35,7 +35,7 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     c.pos = clampToRoom({ x: next.position.x, y: next.position.y });
     const speed = Math.hypot(c.vel.x, c.vel.y);
     if (speed > 15) { const target = Math.atan2(c.vel.x, c.vel.y); c.yaw += Math.atan2(Math.sin(target - c.yaw), Math.cos(target - c.yaw)) * (1 - Math.exp(-12 * dt)); }
-    const g = group.current!;
+    const g = group.current!; (window as unknown as { __g: unknown }).__g = { x: g.position.x, z: g.position.z, cam: state.camera.position.toArray() };
     g.position.set(c.pos.x * UNIT, 0, c.pos.y * UNIT);
     g.rotation.y = c.yaw;
     if (c.wave > 0) c.wave -= dt;
