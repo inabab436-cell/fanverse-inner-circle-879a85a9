@@ -37,7 +37,7 @@ export function collide(p: Vec, props: Prop[], radius = 14): Vec {
   return { x: Math.max(-WORLD, Math.min(WORLD, x)), y: Math.max(-WORLD, Math.min(WORLD, y)) };
 }
 
-export type Avatar = { name: string; x: number; y: number; angle: number; moving: boolean; fast?: boolean; skin: string; shirt: string; hair: string; target?: Vec; wait?: number };
+export type Avatar = { name: string; x: number; y: number; angle: number; moving: boolean; fast?: boolean; skin: string; shirt: string; hair: string; target?: Vec | undefined; wait?: number };
 
 export function buildNpcs(): Avatar[] {
   return [
