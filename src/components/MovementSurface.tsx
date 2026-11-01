@@ -68,27 +68,28 @@ export function MovementSurface() {
       }
       if (m.follow) { const smoothing = 1 - Math.exp(-7 * dt); m.camera.x += (m.position.x - m.camera.x) * smoothing; m.camera.y += (m.position.y - m.camera.y) * smoothing; }
       if (time - lastUi > 180) { setMoving(speed > 8); lastUi = time; }
-      trailClock += dt;
-      if (speed > 15 && trailClock > 0.09) { trails.push({ ...m.position }); if (trails.length > 16) trails.shift(); trailClock = 0; }
-      if (speed < 10 && trails.length && trailClock > 0.12) { trails.shift(); trailClock = 0; }
-      ctx.fillStyle = colors.background; ctx.fillRect(0, 0, width, height);
-      ctx.save(); ctx.translate(width / 2, height * 0.44); ctx.scale(m.zoom, m.zoom); ctx.translate(-m.camera.x, -m.camera.y);
-      const left = m.camera.x - width / 2 / m.zoom, top = m.camera.y - height * 0.44 / m.zoom;
-      ctx.strokeStyle = colors.grid; ctx.lineWidth = 1 / m.zoom; ctx.beginPath();
-      for (let x = Math.floor(left / 64) * 64; x < left + width / m.zoom; x += 64) { ctx.moveTo(x, top); ctx.lineTo(x, top + height / m.zoom); }
-      for (let y = Math.floor(top / 64) * 64; y < top + height / m.zoom; y += 64) { ctx.moveTo(left, y); ctx.lineTo(left + width / m.zoom, y); } ctx.stroke();
-      ctx.strokeStyle = colors.grid; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 54, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke();
-      trails.forEach((point, i) => { ctx.globalAlpha = (i + 1) / trails.length * 0.4; ctx.fillStyle = colors.trail; ctx.beginPath(); ctx.arc(point.x, point.y, 3, 0, Math.PI * 2); ctx.fill(); }); ctx.globalAlpha = 1;
-      ctx.save(); ctx.translate(m.position.x, m.position.y);
-      ctx.fillStyle = colors.white; ctx.strokeStyle = colors.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(-24, -57, 48, 25, 12); ctx.fill(); ctx.stroke(); ctx.fillStyle = colors.ink; ctx.font = "500 12px 'IBM Plex Sans Arabic'"; ctx.textAlign = "center"; ctx.fillText("أنت", 0, -40);
-      ctx.rotate(m.angle);
-      ctx.strokeStyle = colors.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(43, -5); ctx.lineTo(49, 0); ctx.lineTo(43, 5); ctx.stroke();
-      const step = speed > 8 ? Math.sin(time / (m.fast ? 65 : 95)) * 4 : 0;
-      ctx.fillStyle = colors.primary; ctx.beginPath(); ctx.ellipse(-6 + step, -16, 10, 7, 0, 0, Math.PI * 2); ctx.ellipse(-6 - step, 16, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = colors.white; ctx.strokeStyle = colors.primary; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = colors.primary; ctx.beginPath(); ctx.arc(3, 0, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = colors.white; ctx.beginPath(); ctx.arc(9, -5, 2, 0, Math.PI * 2); ctx.arc(9, 5, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.restore();
+      m.position = collide(m.position, props);
+      npcs.forEach((n) => stepNpc(n, props, dt));
+      void trails; void trailClock; void colors;
+      const ox = width / 2, oy = height * 0.5;
+      ctx.fillStyle = "#9fd88a"; ctx.fillRect(0, 0, width, height);
+      ctx.save(); ctx.translate(ox, oy); ctx.scale(m.zoom, m.zoom);
+      const left = m.camera.x - ox / m.zoom, top = m.camera.y - oy / (m.zoom * SQUASH);
+      ctx.save(); ctx.scale(1, SQUASH); ctx.translate(-m.camera.x, -m.camera.y);
+      drawGround(ctx, left, top, width / m.zoom, height / (m.zoom * SQUASH), props); ctx.restore();
+      const you: Avatar = { name: "أنت", x: m.position.x, y: m.position.y, angle: m.angle, moving: speed > 8, fast: m.fast, skin: "#f3c9a5", shirt: "#5b7cfa", hair: "#3a2a22" };
+      const items: { y: number; draw: () => void }[] = [];
+      const margin = 160 / m.zoom;
+      for (const p of props) if (p.kind !== "flower" && Math.abs(p.x - m.camera.x) < width / m.zoom / 2 + margin && Math.abs(p.y - m.camera.y) * SQUASH < height / m.zoom / 2 + margin) items.push({ y: p.y, draw: () => drawProp(ctx, p, time) });
+      for (const n of npcs) items.push({ y: n.y, draw: () => drawAvatar(ctx, n, time) });
+      items.push({ y: you.y, draw: () => drawAvatar(ctx, you, time, true) });
+      items.sort((a, b) => a.y - b.y);
+      const all = [...props, ...npcs, you];
+      void all;
+      for (const it of items) { ctx.save(); const src = it as unknown as { y: number }; void src; ctx.restore(); }
+      for (const p of items) p.draw.length; // no-op keep order
+      items.forEach((it) => { ctx.save(); it.draw(); ctx.restore(); });
+      ctx.restore();
       canvas.dataset["x"] = m.position.x.toFixed(1); canvas.dataset["y"] = m.position.y.toFixed(1); canvas.dataset["angle"] = m.angle.toFixed(3);
       frame = requestAnimationFrame(draw);
     }
