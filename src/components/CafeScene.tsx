@@ -25,7 +25,7 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
   const { scene, animations } = useGLTF(robotModel.url);
   const { actions } = useAnimations(animations, group);
   const current = useRef("");
-  const scale = useMemo(() => { const box = new THREE.Box3().setFromObject(scene); return 1.7 / (box.max.y - box.min.y); }, [scene]);
+  const scale = 0.42;
   useEffect(() => { scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; }); }, [scene]);
   useFrame((state, delta) => {
     const c = ctl.current;
@@ -44,8 +44,8 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     // follow camera
     const cam = state.camera;
     const tx = g.position.x, tz = g.position.z;
-    cam.position.lerp(new THREE.Vector3(tx, 3.2, tz + 5.2), 1 - Math.exp(-4 * dt));
-    cam.lookAt(tx, 1, tz);
+    cam.position.lerp(new THREE.Vector3(tx, 2.6, tz + 4), 1 - Math.exp(-4 * dt));
+    cam.lookAt(tx, 1.1, tz - 0.5);
     state.gl.domElement.parentElement?.setAttribute("data-scene-ready", "1");
   });
   return <group ref={group}><primitive object={scene} scale={scale} /></group>;
@@ -100,7 +100,7 @@ function Room() {
 }
 
 export function CafeScene() {
-  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 0, y: 220 }, vel: { x: 0, y: 0 }, yaw: Math.PI });
+  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 0, y: 300 }, vel: { x: 0, y: 0 }, yaw: Math.PI });
   const stickRef = useRef<HTMLDivElement>(null);
   const [fast, setFast] = useState(false);
 
