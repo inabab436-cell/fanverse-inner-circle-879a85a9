@@ -18,3 +18,17 @@ export function advance(position: Vec, velocity: Vec, input: Vec, fast: boolean,
 export function zoomAt(camera: Vec, oldZoom: number, newZoom: number, point: Vec): Vec {
   return { x: camera.x + point.x / oldZoom - point.x / newZoom, y: camera.y + point.y / oldZoom - point.y / newZoom };
 }
+export const MIN_SENSITIVITY = 0.4;
+export const MAX_SENSITIVITY = 2;
+export const DEFAULT_SENSITIVITY = 1;
+export function clampSensitivity(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_SENSITIVITY;
+  return Math.min(MAX_SENSITIVITY, Math.max(MIN_SENSITIVITY, value));
+}
+export function scaleInput(input: Vec, sensitivity: number): Vec {
+  const factor = clampSensitivity(sensitivity);
+  return { x: input.x * factor, y: input.y * factor };
+}
+export function turnRate(sensitivity: number): number {
+  return 6 + 14 * clampSensitivity(sensitivity);
+}
