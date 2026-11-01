@@ -12,6 +12,7 @@ const ROOM = 460; // px
 const TABLE_R = 135; // px
 const LOOK_SPEED = 0.008; // radians of camera turn per dragged px
 const TURN = 12;
+type PE = import("react").PointerEvent<HTMLDivElement>;
 
 type Ctl = { input: Vec; fast: boolean; wave: number; pos: Vec; vel: Vec; yaw: number; camYaw: number };
 
@@ -119,17 +120,12 @@ export function CafeScene() {
     b.style.opacity = on ? "1" : "0"; b.style.transform = `translate(${ox - R}px, ${oy - R}px)`;
     k.style.transform = `translate(${dx}px, ${dy}px)`;
   }
-  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+  function onDown(e: PE) {
     e.currentTarget.setPointerCapture(e.pointerId);
-    if (!move.current && (!look.current || true) && (move.current === null && (look.current === null || look.current.id !== e.pointerId)) && !(look.current === null && e.pointerType === "mouse" && e.button === 2)) {
-      if (!move.current && (look.current || e.clientX < window.innerWidth / 2 || look.current === null)) {
-        if (!move.current && !(look.current === null && move.current)) { /* first finger walks */ }
-      }
-    }
     if (!move.current) { move.current = { id: e.pointerId, ox: e.clientX, oy: e.clientY }; showStick(e.clientX, e.clientY, 0, 0, true); }
     else if (!look.current) look.current = { id: e.pointerId, x: e.clientX };
   }
-  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+  function onMove(e: PE) {
     const m = move.current, l = look.current;
     if (m && m.id === e.pointerId) {
       let dx = e.clientX - m.ox, dy = e.clientY - m.oy; const d = Math.hypot(dx, dy);
@@ -138,11 +134,10 @@ export function CafeScene() {
       showStick(m.ox, m.oy, dx, dy, true);
     } else if (l && l.id === e.pointerId) { ctl.current.camYaw -= (e.clientX - l.x) * LOOK_SPEED; l.x = e.clientX; }
   }
-  function onUp(e: React.PointerEvent<HTMLDivElement>) {
+  function onUp(e: PE) {
     if (move.current?.id === e.pointerId) { move.current = null; ctl.current.input = { x: 0, y: 0 }; showStick(0, 0, 0, 0, false); }
     if (look.current?.id === e.pointerId) look.current = null;
   }
-  const stickRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const keys = new Set<string>();
     const sync = () => {
