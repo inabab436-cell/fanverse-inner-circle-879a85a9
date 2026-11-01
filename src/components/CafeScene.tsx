@@ -49,7 +49,9 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     const back = portrait ? 3.6 : 2.6;
     cam.position.lerp(new THREE.Vector3(tx + 1.2 * back / 3.6, portrait ? 2.2 : 1.8, tz + back), 1 - Math.exp(-4 * dt));
     cam.lookAt(tx - 0.3, 0.95, tz - 0.4);
-    state.gl.domElement.parentElement?.setAttribute("data-scene-ready", "1");
+    const host = state.gl.domElement.parentElement;
+    host?.setAttribute("data-scene-ready", "1");
+    host?.setAttribute("data-pos", `${c.pos.x.toFixed(1)},${c.pos.y.toFixed(1)}`);
   });
   return <group ref={group}><primitive object={scene} scale={scale} /></group>;
 }
