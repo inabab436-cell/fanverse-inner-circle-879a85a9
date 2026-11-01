@@ -130,7 +130,7 @@ export function CafeScene() {
 
   return (
     <div className="movement-shell relative h-dvh overflow-hidden bg-background">
-      <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 3.2, 7.4], fov: 45 }} className="touch-none">
+      <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 2.6, 7], fov: 50 }} className="touch-none">
         <color attach="background" args={["#f6e9da"]} />
         <hemisphereLight args={["#fff4e0", "#8a6a50", 0.7]} />
         <directionalLight position={[4, 7, 3]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-6} shadow-camera-right={6} shadow-camera-top={6} shadow-camera-bottom={-6} />
