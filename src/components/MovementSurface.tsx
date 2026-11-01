@@ -78,17 +78,13 @@ export function MovementSurface() {
       ctx.save(); ctx.scale(1, SQUASH); ctx.translate(-m.camera.x, -m.camera.y);
       drawGround(ctx, left, top, width / m.zoom, height / (m.zoom * SQUASH), props); ctx.restore();
       const you: Avatar = { name: "أنت", x: m.position.x, y: m.position.y, angle: m.angle, moving: speed > 8, fast: m.fast, skin: "#f3c9a5", shirt: "#5b7cfa", hair: "#3a2a22" };
-      const items: { y: number; draw: () => void }[] = [];
+      const items: { x: number; y: number; draw: () => void }[] = [];
       const margin = 160 / m.zoom;
-      for (const p of props) if (p.kind !== "flower" && Math.abs(p.x - m.camera.x) < width / m.zoom / 2 + margin && Math.abs(p.y - m.camera.y) * SQUASH < height / m.zoom / 2 + margin) items.push({ y: p.y, draw: () => drawProp(ctx, p, time) });
-      for (const n of npcs) items.push({ y: n.y, draw: () => drawAvatar(ctx, n, time) });
-      items.push({ y: you.y, draw: () => drawAvatar(ctx, you, time, true) });
+      for (const p of props) if (p.kind !== "flower" && Math.abs(p.x - m.camera.x) < width / m.zoom / 2 + margin && Math.abs(p.y - m.camera.y) * SQUASH < height / m.zoom / 2 + margin) items.push({ x: p.x, y: p.y, draw: () => drawProp(ctx, p, time) });
+      for (const n of npcs) items.push({ x: n.x, y: n.y, draw: () => drawAvatar(ctx, n, time) });
+      items.push({ x: you.x, y: you.y, draw: () => drawAvatar(ctx, you, time, true) });
       items.sort((a, b) => a.y - b.y);
-      const all = [...props, ...npcs, you];
-      void all;
-      for (const it of items) { ctx.save(); const src = it as unknown as { y: number }; void src; ctx.restore(); }
-      for (const p of items) p.draw.length; // no-op keep order
-      items.forEach((it) => { ctx.save(); it.draw(); ctx.restore(); });
+      items.forEach((it) => { ctx.save(); ctx.translate(it.x - m.camera.x, (it.y - m.camera.y) * SQUASH); it.draw(); ctx.restore(); });
       ctx.restore();
       canvas.dataset["x"] = m.position.x.toFixed(1); canvas.dataset["y"] = m.position.y.toFixed(1); canvas.dataset["angle"] = m.angle.toFixed(3);
       frame = requestAnimationFrame(draw);
