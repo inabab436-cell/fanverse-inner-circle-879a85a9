@@ -25,7 +25,7 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
   const { scene, animations } = useGLTF(robotModel.url);
   const { actions } = useAnimations(animations, group);
   const current = useRef("");
-  const scale = 0.42;
+  const scale = 0.22;
   useEffect(() => { scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; }); }, [scene]);
   useFrame((state, delta) => {
     const c = ctl.current;
@@ -44,8 +44,8 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     // follow camera
     const cam = state.camera;
     const tx = g.position.x, tz = g.position.z;
-    cam.position.lerp(new THREE.Vector3(tx, 2.6, tz + 4), 1 - Math.exp(-4 * dt));
-    cam.lookAt(tx, 1.1, tz - 0.5);
+    cam.position.lerp(new THREE.Vector3(tx + 1.2, 2.2, tz + 3.6), 1 - Math.exp(-4 * dt));
+    cam.lookAt(tx - 0.3, 0.95, tz - 0.4);
     state.gl.domElement.parentElement?.setAttribute("data-scene-ready", "1");
   });
   return <group ref={group}><primitive object={scene} scale={scale} /></group>;
@@ -100,7 +100,7 @@ function Room() {
 }
 
 export function CafeScene() {
-  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 0, y: 300 }, vel: { x: 0, y: 0 }, yaw: Math.PI });
+  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 120, y: 260 }, vel: { x: 0, y: 0 }, yaw: 0 });
   const stickRef = useRef<HTMLDivElement>(null);
   const [fast, setFast] = useState(false);
 
@@ -130,7 +130,7 @@ export function CafeScene() {
 
   return (
     <div className="movement-shell relative h-dvh overflow-hidden bg-background">
-      <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 2.6, 7], fov: 50 }} className="touch-none">
+      <Canvas shadows dpr={[1, 1.75]} camera={{ position: [2.4, 2.2, 6.2], fov: 50 }} className="touch-none">
         <color attach="background" args={["#f6e9da"]} />
         <hemisphereLight args={["#fff4e0", "#8a6a50", 0.7]} />
         <directionalLight position={[4, 7, 3]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-6} shadow-camera-right={6} shadow-camera-top={6} shadow-camera-bottom={-6} />
