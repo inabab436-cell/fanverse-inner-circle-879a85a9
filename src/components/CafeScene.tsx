@@ -86,7 +86,7 @@ function Room() {
       <mesh position={[0, 0.37, 0]} castShadow><cylinderGeometry args={[0.08, 0.1, 0.74]} /><meshStandardMaterial color="#3d2a1f" /></mesh>
       <mesh position={[0, 0.02, 0]}><cylinderGeometry args={[0.45, 0.5, 0.04, 32]} /><meshStandardMaterial color="#3d2a1f" /></mesh>
       {/* cups + vase */}
-      {[0.5, 2.6, 4.4].map((a, i) => <mesh key={i} position={[Math.sin(a) * 0.55, 0.85, Math.cos(a) * 0.55]} castShadow><cylinderGeometry args={[0.07, 0.06, 0.13, 20]} /><meshStandardMaterial color={["#ffffff", "#7cc6fe", "#ff8fab"][i]} /></mesh>)}
+      {[0.5, 2.6, 4.4].map((a, i) => <mesh key={i} position={[Math.sin(a) * 0.55, 0.85, Math.cos(a) * 0.55]} castShadow><cylinderGeometry args={[0.07, 0.06, 0.13, 20]} /><meshStandardMaterial color={["#ffffff", "#7cc6fe", "#ff8fab"][i] ?? "#ffffff"} /></mesh>)}
       <mesh position={[0, 0.92, 0]} castShadow><sphereGeometry args={[0.13, 24, 16]} /><meshStandardMaterial color="#5aae6f" /></mesh>
       <mesh position={[0, 1.08, 0]}><sphereGeometry args={[0.09, 16, 12]} /><meshStandardMaterial color="#ffd166" /></mesh>
       {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => <Chair key={a} angle={a} />)}
