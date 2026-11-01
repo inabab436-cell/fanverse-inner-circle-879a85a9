@@ -43,8 +43,6 @@ export function MovementSurface() {
     const canvas: HTMLCanvasElement = element;
     const ctx: CanvasRenderingContext2D = context;
     let width = 0, height = 0, frame = 0, previous = 0, lastUi = 0;
-    const css = getComputedStyle(document.documentElement);
-    const colors = { background: css.getPropertyValue("--background"), grid: css.getPropertyValue("--movement-grid"), primary: css.getPropertyValue("--primary"), accent: css.getPropertyValue("--accent"), white: css.getPropertyValue("--card"), ink: css.getPropertyValue("--foreground"), muted: css.getPropertyValue("--muted-foreground"), trail: css.getPropertyValue("--movement-trail") };
     const resize = () => { const rect = canvas.getBoundingClientRect(); width = rect.width; height = rect.height; const dpr = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
     const keys = new Set<string>();
@@ -52,8 +50,6 @@ export function MovementSurface() {
     const keyup = (event: KeyboardEvent) => { keys.delete(event.key.toLowerCase()); };
     const clear = () => { keys.clear(); resetInput(); model.current.looking = false; };
     window.addEventListener("keydown", keydown); window.addEventListener("keyup", keyup); window.addEventListener("blur", clear); document.addEventListener("visibilitychange", clear);
-    const trails: Vec[] = [];
-    let trailClock = 0;
     function draw(time: number) {
       const m = model.current;
       const dt = previous ? Math.min((time - previous) / 1000, 0.05) : 0; previous = time;
@@ -108,7 +104,7 @@ export function MovementSurface() {
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
       if (pinchDistance.current > 0) { const rect = event.currentTarget.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * distance / pinchDistance.current)); m.camera = zoomAt(m.camera, m.zoom, next, { x: (a.x + b.x) / 2 - rect.left - rect.width / 2, y: (a.y + b.y) / 2 - rect.top - rect.height * 0.44 }); m.zoom = next; setZoom(next); m.follow = false; setFollow(false); } pinchDistance.current = distance;
     } else if (!m.follow) { m.camera.x -= (current.x - previous.x) / m.zoom; m.camera.y -= (current.y - previous.y) / m.zoom; }
-    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.44 - (m.position.y - m.camera.y) * m.zoom; const target = Math.atan2(y, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
+    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.44 - (m.position.y - m.camera.y) * SQUASH * m.zoom; const target = Math.atan2(y, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
   }
   function release(event: React.PointerEvent<HTMLCanvasElement>) { pointers.current.delete(event.pointerId); pinchDistance.current = 0; if (!pointers.current.size) model.current.looking = false; }
 
