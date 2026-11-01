@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Eye, Footprints, Minus, Plus, RotateCcw, Settings2, X, MoveUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { advance, analogInput, zoomAt, type Vec } from "@/lib/movement";
+import { SQUASH, buildNpcs, buildProps, collide, drawAvatar, drawGround, drawProp, stepNpc, type Avatar } from "@/lib/scene";
 
 export function MovementSurface() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,17 +44,14 @@ export function MovementSurface() {
     const canvas: HTMLCanvasElement = element;
     const ctx: CanvasRenderingContext2D = context;
     let width = 0, height = 0, frame = 0, previous = 0, lastUi = 0;
-    const css = getComputedStyle(document.documentElement);
-    const colors = { background: css.getPropertyValue("--background"), grid: css.getPropertyValue("--movement-grid"), primary: css.getPropertyValue("--primary"), accent: css.getPropertyValue("--accent"), white: css.getPropertyValue("--card"), ink: css.getPropertyValue("--foreground"), muted: css.getPropertyValue("--muted-foreground"), trail: css.getPropertyValue("--movement-trail") };
     const resize = () => { const rect = canvas.getBoundingClientRect(); width = rect.width; height = rect.height; const dpr = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
+    const props = buildProps(); const npcs = buildNpcs();
     const keys = new Set<string>();
     const keydown = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement) return; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) event.preventDefault(); keys.add(event.key.toLowerCase()); };
     const keyup = (event: KeyboardEvent) => { keys.delete(event.key.toLowerCase()); };
     const clear = () => { keys.clear(); resetInput(); model.current.looking = false; };
     window.addEventListener("keydown", keydown); window.addEventListener("keyup", keyup); window.addEventListener("blur", clear); document.addEventListener("visibilitychange", clear);
-    const trails: Vec[] = [];
-    let trailClock = 0;
     function draw(time: number) {
       const m = model.current;
       const dt = previous ? Math.min((time - previous) / 1000, 0.05) : 0; previous = time;
@@ -68,32 +66,28 @@ export function MovementSurface() {
       }
       if (m.follow) { const smoothing = 1 - Math.exp(-7 * dt); m.camera.x += (m.position.x - m.camera.x) * smoothing; m.camera.y += (m.position.y - m.camera.y) * smoothing; }
       if (time - lastUi > 180) { setMoving(speed > 8); lastUi = time; }
-      trailClock += dt;
-      if (speed > 15 && trailClock > 0.09) { trails.push({ ...m.position }); if (trails.length > 16) trails.shift(); trailClock = 0; }
-      if (speed < 10 && trails.length && trailClock > 0.12) { trails.shift(); trailClock = 0; }
-      ctx.fillStyle = colors.background; ctx.fillRect(0, 0, width, height);
-      ctx.save(); ctx.translate(width / 2, height * 0.44); ctx.scale(m.zoom, m.zoom); ctx.translate(-m.camera.x, -m.camera.y);
-      const left = m.camera.x - width / 2 / m.zoom, top = m.camera.y - height * 0.44 / m.zoom;
-      ctx.strokeStyle = colors.grid; ctx.lineWidth = 1 / m.zoom; ctx.beginPath();
-      for (let x = Math.floor(left / 64) * 64; x < left + width / m.zoom; x += 64) { ctx.moveTo(x, top); ctx.lineTo(x, top + height / m.zoom); }
-      for (let y = Math.floor(top / 64) * 64; y < top + height / m.zoom; y += 64) { ctx.moveTo(left, y); ctx.lineTo(left + width / m.zoom, y); } ctx.stroke();
-      ctx.strokeStyle = colors.grid; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 54, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke();
-      trails.forEach((point, i) => { ctx.globalAlpha = (i + 1) / trails.length * 0.4; ctx.fillStyle = colors.trail; ctx.beginPath(); ctx.arc(point.x, point.y, 3, 0, Math.PI * 2); ctx.fill(); }); ctx.globalAlpha = 1;
-      ctx.save(); ctx.translate(m.position.x, m.position.y);
-      ctx.fillStyle = colors.white; ctx.strokeStyle = colors.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(-24, -57, 48, 25, 12); ctx.fill(); ctx.stroke(); ctx.fillStyle = colors.ink; ctx.font = "500 12px 'IBM Plex Sans Arabic'"; ctx.textAlign = "center"; ctx.fillText("أنت", 0, -40);
-      ctx.rotate(m.angle);
-      ctx.strokeStyle = colors.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(43, -5); ctx.lineTo(49, 0); ctx.lineTo(43, 5); ctx.stroke();
-      const step = speed > 8 ? Math.sin(time / (m.fast ? 65 : 95)) * 4 : 0;
-      ctx.fillStyle = colors.primary; ctx.beginPath(); ctx.ellipse(-6 + step, -16, 10, 7, 0, 0, Math.PI * 2); ctx.ellipse(-6 - step, 16, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = colors.white; ctx.strokeStyle = colors.primary; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = colors.primary; ctx.beginPath(); ctx.arc(3, 0, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = colors.white; ctx.beginPath(); ctx.arc(9, -5, 2, 0, Math.PI * 2); ctx.arc(9, 5, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.restore();
+      m.position = collide(m.position, props);
+      npcs.forEach((n) => stepNpc(n, props, dt));
+      const ox = width / 2, oy = height * 0.5;
+      ctx.fillStyle = "#9fd88a"; ctx.fillRect(0, 0, width, height);
+      ctx.save(); ctx.translate(ox, oy); ctx.scale(m.zoom, m.zoom);
+      const left = m.camera.x - ox / m.zoom, top = m.camera.y - oy / (m.zoom * SQUASH);
+      ctx.save(); ctx.scale(1, SQUASH); ctx.translate(-m.camera.x, -m.camera.y);
+      drawGround(ctx, left, top, width / m.zoom, height / (m.zoom * SQUASH), props); ctx.restore();
+      const you: Avatar = { name: "أنت", x: m.position.x, y: m.position.y, angle: m.angle, moving: speed > 8, fast: m.fast, skin: "#f3c9a5", shirt: "#5b7cfa", hair: "#3a2a22" };
+      const items: { x: number; y: number; draw: () => void }[] = [];
+      const margin = 160 / m.zoom;
+      for (const p of props) if (p.kind !== "flower" && Math.abs(p.x - m.camera.x) < width / m.zoom / 2 + margin && Math.abs(p.y - m.camera.y) * SQUASH < height / m.zoom / 2 + margin) items.push({ x: p.x, y: p.y, draw: () => drawProp(ctx, p, time) });
+      for (const n of npcs) items.push({ x: n.x, y: n.y, draw: () => drawAvatar(ctx, n, time) });
+      items.push({ x: you.x, y: you.y, draw: () => drawAvatar(ctx, you, time, true) });
+      items.sort((a, b) => a.y - b.y);
+      items.forEach((it) => { ctx.save(); ctx.translate(it.x - m.camera.x, (it.y - m.camera.y) * SQUASH); it.draw(); ctx.restore(); });
+      ctx.restore();
       canvas.dataset["x"] = m.position.x.toFixed(1); canvas.dataset["y"] = m.position.y.toFixed(1); canvas.dataset["angle"] = m.angle.toFixed(3);
       frame = requestAnimationFrame(draw);
     }
     frame = requestAnimationFrame(draw);
-    const wheel = (event: WheelEvent) => { event.preventDefault(); const m = model.current; const rect = canvas.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * Math.exp(-event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1) * 0.0015))); m.camera = zoomAt(m.camera, m.zoom, next, { x: event.clientX - rect.left - width / 2, y: event.clientY - rect.top - height * 0.44 }); m.zoom = next; m.follow = false; setFollow(false); setZoom(next); };
+    const wheel = (event: WheelEvent) => { event.preventDefault(); const m = model.current; const rect = canvas.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * Math.exp(-event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1) * 0.0015))); m.camera = zoomAt(m.camera, m.zoom, next, { x: event.clientX - rect.left - width / 2, y: event.clientY - rect.top - height * 0.5 }); m.zoom = next; m.follow = false; setFollow(false); setZoom(next); };
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener("wheel", wheel); window.removeEventListener("keydown", keydown); window.removeEventListener("keyup", keyup); window.removeEventListener("blur", clear); document.removeEventListener("visibilitychange", clear); };
   }, []);
@@ -109,9 +103,9 @@ export function MovementSurface() {
       const [a, b] = Array.from(pointers.current.values());
       if (!a || !b) return;
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchDistance.current > 0) { const rect = event.currentTarget.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * distance / pinchDistance.current)); m.camera = zoomAt(m.camera, m.zoom, next, { x: (a.x + b.x) / 2 - rect.left - rect.width / 2, y: (a.y + b.y) / 2 - rect.top - rect.height * 0.44 }); m.zoom = next; setZoom(next); m.follow = false; setFollow(false); } pinchDistance.current = distance;
+      if (pinchDistance.current > 0) { const rect = event.currentTarget.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * distance / pinchDistance.current)); m.camera = zoomAt(m.camera, m.zoom, next, { x: (a.x + b.x) / 2 - rect.left - rect.width / 2, y: (a.y + b.y) / 2 - rect.top - rect.height * 0.5 }); m.zoom = next; setZoom(next); m.follow = false; setFollow(false); } pinchDistance.current = distance;
     } else if (!m.follow) { m.camera.x -= (current.x - previous.x) / m.zoom; m.camera.y -= (current.y - previous.y) / m.zoom; }
-    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.44 - (m.position.y - m.camera.y) * m.zoom; const target = Math.atan2(y, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
+    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.5 - (m.position.y - m.camera.y) * SQUASH * m.zoom; const target = Math.atan2(y / SQUASH, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
   }
   function release(event: React.PointerEvent<HTMLCanvasElement>) { pointers.current.delete(event.pointerId); pinchDistance.current = 0; if (!pointers.current.size) model.current.looking = false; }
 
