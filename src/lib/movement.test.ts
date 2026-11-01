@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, analogInput, zoomAt } from "./movement";
+import { advance, analogInput, clampSensitivity, scaleInput, turnRate, zoomAt } from "./movement";
 
 describe("social walking", () => {
   it("ignores small thumb drift", () => { expect(analogInput({ x: 0.08, y: 0 })).toEqual({ x: 0, y: 0 }); });
