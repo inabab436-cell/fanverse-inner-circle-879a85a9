@@ -1,8 +1,8 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Lightformer, useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { Footprints, Hand } from "lucide-react";
+import { Hand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { advance, analogInput, type Vec } from "@/lib/movement";
 import robotModel from "@/assets/models/avatar-robot.glb.asset.json";
@@ -44,7 +44,9 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     // follow camera
     const cam = state.camera;
     const tx = g.position.x, tz = g.position.z;
-    cam.position.lerp(new THREE.Vector3(tx + 1.2, 2.2, tz + 3.6), 1 - Math.exp(-4 * dt));
+    const portrait = state.size.height > state.size.width;
+    const back = portrait ? 3.6 : 2.6;
+    cam.position.lerp(new THREE.Vector3(tx + 1.2 * back / 3.6, portrait ? 2.2 : 1.8, tz + back), 1 - Math.exp(-4 * dt));
     cam.lookAt(tx - 0.3, 0.95, tz - 0.4);
     state.gl.domElement.parentElement?.setAttribute("data-scene-ready", "1");
   });
@@ -102,7 +104,6 @@ function Room() {
 export function CafeScene() {
   const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 120, y: 260 }, vel: { x: 0, y: 0 }, yaw: 0 });
   const stickRef = useRef<HTMLDivElement>(null);
-  const [fast, setFast] = useState(false);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -110,7 +111,7 @@ export function CafeScene() {
       const x = Number(keys.has("KeyD") || keys.has("ArrowRight")) - Number(keys.has("KeyA") || keys.has("ArrowLeft"));
       const y = Number(keys.has("KeyS") || keys.has("ArrowDown")) - Number(keys.has("KeyW") || keys.has("ArrowUp"));
       ctl.current.input = analogInput({ x, y });
-      ctl.current.fast = keys.has("ShiftLeft") || keys.has("ShiftRight") || fastRef.current;
+      ctl.current.fast = keys.has("ShiftLeft") || keys.has("ShiftRight");
     };
     const down = (e: KeyboardEvent) => { if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault(); if (e.code === "KeyE") ctl.current.wave = 2; keys.add(e.code); sync(); };
     const up = (e: KeyboardEvent) => { keys.delete(e.code); sync(); };
@@ -119,14 +120,13 @@ export function CafeScene() {
     let destroy: (() => void) | undefined; let disposed = false;
     import("nipplejs").then(({ create }) => {
       if (disposed || !stickRef.current) return;
-      const j = create({ zone: stickRef.current, mode: "static", position: { left: "50%", top: "50%" }, size: 112, color: { front: "var(--primary)", back: "var(--secondary)" } });
+      const j = create({ zone: stickRef.current, mode: "dynamic", size: 120, fadeTime: 120, color: { front: "var(--primary)", back: "var(--secondary)" } });
       j.on("move", (ev) => { ctl.current.input = analogInput({ x: ev.data.vector.x, y: -ev.data.vector.y }); });
       j.on("end", () => { ctl.current.input = { x: 0, y: 0 }; });
       destroy = () => j.destroy();
     });
     return () => { disposed = true; destroy?.(); window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", blur); };
   }, []);
-  const fastRef = useRef(false);
 
   return (
     <div className="movement-shell relative h-dvh overflow-hidden bg-background">
@@ -147,11 +147,9 @@ export function CafeScene() {
         <h1 dir="ltr" className="text-3xl font-extrabold text-primary">orbit<span className="text-accent">.</span></h1>
         <p className="mt-1 text-xs text-muted-foreground">المقهى · امشِ حول الطاولة</p>
       </header>
-      <div className="movement-stick absolute bottom-7 left-5"><div ref={stickRef} className="relative h-36 w-36 touch-none rounded-full border border-border bg-card/70" aria-label="عصا الحركة" /></div>
-      <div className="movement-actions absolute bottom-10 right-6 flex flex-col items-center gap-3">
-        <Button variant="outline" className="h-14 w-14 rounded-full border-2 bg-card text-primary" aria-label="تلويح" onClick={() => { ctl.current.wave = 2; }}><Hand className="size-6" /></Button>
-        <Button variant={fast ? "default" : "outline"} className="h-14 w-14 rounded-full border-2" aria-label="مشي سريع" aria-pressed={fast} onClick={() => { fastRef.current = !fast; ctl.current.fast = !fast; setFast(!fast); }}><Footprints className="size-6" /></Button>
-      </div>
+      <div ref={stickRef} className="absolute inset-0 touch-none" aria-label="المس أي مكان واسحب للمشي" />
+      <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-muted-foreground">المس أي مكان واسحب للمشي</p>
+      <Button variant="outline" className="movement-actions absolute bottom-8 right-6 z-10 h-14 w-14 rounded-full border-2 bg-card text-primary" aria-label="تلويح" onClick={() => { ctl.current.wave = 2; }}><Hand className="size-6" /></Button>
     </div>
   );
 }
