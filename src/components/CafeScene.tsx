@@ -48,7 +48,7 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     cam.lookAt(tx - 0.3, 0.95, tz - 0.4);
     state.gl.domElement.parentElement?.setAttribute("data-scene-ready", "1");
   });
-  return <group ref={group}><primitive object={scene} scale={scale} /></group>;
+  return <group ref={group}><primitive object={scene} scale={scale} rotation-y={Math.PI} /></group>;
 }
 
 function woodTexture() {
