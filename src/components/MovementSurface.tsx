@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Eye, Footprints, Minus, Plus, RotateCcw, Settings2, X, MoveUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { advance, analogInput, zoomAt, type Vec } from "@/lib/movement";
+import { SQUASH, buildNpcs, buildProps, collide, drawAvatar, drawGround, drawProp, stepNpc, type Avatar } from "@/lib/scene";
 
 export function MovementSurface() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +46,7 @@ export function MovementSurface() {
     let width = 0, height = 0, frame = 0, previous = 0, lastUi = 0;
     const resize = () => { const rect = canvas.getBoundingClientRect(); width = rect.width; height = rect.height; const dpr = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
+    const props = buildProps(); const npcs = buildNpcs();
     const keys = new Set<string>();
     const keydown = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement) return; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) event.preventDefault(); keys.add(event.key.toLowerCase()); };
     const keyup = (event: KeyboardEvent) => { keys.delete(event.key.toLowerCase()); };
@@ -66,7 +68,6 @@ export function MovementSurface() {
       if (time - lastUi > 180) { setMoving(speed > 8); lastUi = time; }
       m.position = collide(m.position, props);
       npcs.forEach((n) => stepNpc(n, props, dt));
-      void trails; void trailClock; void colors;
       const ox = width / 2, oy = height * 0.5;
       ctx.fillStyle = "#9fd88a"; ctx.fillRect(0, 0, width, height);
       ctx.save(); ctx.translate(ox, oy); ctx.scale(m.zoom, m.zoom);
@@ -86,7 +87,7 @@ export function MovementSurface() {
       frame = requestAnimationFrame(draw);
     }
     frame = requestAnimationFrame(draw);
-    const wheel = (event: WheelEvent) => { event.preventDefault(); const m = model.current; const rect = canvas.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * Math.exp(-event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1) * 0.0015))); m.camera = zoomAt(m.camera, m.zoom, next, { x: event.clientX - rect.left - width / 2, y: event.clientY - rect.top - height * 0.44 }); m.zoom = next; m.follow = false; setFollow(false); setZoom(next); };
+    const wheel = (event: WheelEvent) => { event.preventDefault(); const m = model.current; const rect = canvas.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * Math.exp(-event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1) * 0.0015))); m.camera = zoomAt(m.camera, m.zoom, next, { x: event.clientX - rect.left - width / 2, y: event.clientY - rect.top - height * 0.5 }); m.zoom = next; m.follow = false; setFollow(false); setZoom(next); };
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener("wheel", wheel); window.removeEventListener("keydown", keydown); window.removeEventListener("keyup", keyup); window.removeEventListener("blur", clear); document.removeEventListener("visibilitychange", clear); };
   }, []);
@@ -102,9 +103,9 @@ export function MovementSurface() {
       const [a, b] = Array.from(pointers.current.values());
       if (!a || !b) return;
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchDistance.current > 0) { const rect = event.currentTarget.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * distance / pinchDistance.current)); m.camera = zoomAt(m.camera, m.zoom, next, { x: (a.x + b.x) / 2 - rect.left - rect.width / 2, y: (a.y + b.y) / 2 - rect.top - rect.height * 0.44 }); m.zoom = next; setZoom(next); m.follow = false; setFollow(false); } pinchDistance.current = distance;
+      if (pinchDistance.current > 0) { const rect = event.currentTarget.getBoundingClientRect(); const next = Math.max(0.65, Math.min(1.8, m.zoom * distance / pinchDistance.current)); m.camera = zoomAt(m.camera, m.zoom, next, { x: (a.x + b.x) / 2 - rect.left - rect.width / 2, y: (a.y + b.y) / 2 - rect.top - rect.height * 0.5 }); m.zoom = next; setZoom(next); m.follow = false; setFollow(false); } pinchDistance.current = distance;
     } else if (!m.follow) { m.camera.x -= (current.x - previous.x) / m.zoom; m.camera.y -= (current.y - previous.y) / m.zoom; }
-    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.44 - (m.position.y - m.camera.y) * SQUASH * m.zoom; const target = Math.atan2(y, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
+    else { const rect = event.currentTarget.getBoundingClientRect(); const x = current.x - rect.left - rect.width / 2 - (m.position.x - m.camera.x) * m.zoom; const y = current.y - rect.top - rect.height * 0.5 - (m.position.y - m.camera.y) * SQUASH * m.zoom; const target = Math.atan2(y / SQUASH, x); m.angle += Math.atan2(Math.sin(target - m.angle), Math.cos(target - m.angle)) * Math.min(1, sensitivityRef.current); m.looking = true; }
   }
   function release(event: React.PointerEvent<HTMLCanvasElement>) { pointers.current.delete(event.pointerId); pinchDistance.current = 0; if (!pointers.current.size) model.current.looking = false; }
 
