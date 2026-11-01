@@ -1,18 +1,19 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Lightformer, useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { Hand, Settings2, X } from "lucide-react";
+import { Hand } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { advance, analogInput, clampSensitivity, DEFAULT_SENSITIVITY, scaleInput, turnRate, type Vec } from "@/lib/movement";
+import { advance, analogInput, type Vec } from "@/lib/movement";
 import robotModel from "@/assets/models/avatar-robot.glb.asset.json";
 
 const UNIT = 0.01; // movement px -> metres
 const ROOM = 460; // px
 const TABLE_R = 135; // px
-const SENS_KEY = "orbit.sensitivity";
+const LOOK_SPEED = 0.008; // radians of camera turn per dragged px
+const TURN = 12;
 
-type Ctl = { input: Vec; fast: boolean; wave: number; pos: Vec; vel: Vec; yaw: number; sens: number };
+type Ctl = { input: Vec; fast: boolean; wave: number; pos: Vec; vel: Vec; yaw: number; camYaw: number };
 
 function clampToRoom(p: Vec): Vec {
   let { x, y } = p;
@@ -31,11 +32,13 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
   useFrame((state, delta) => {
     const c = ctl.current;
     const dt = Math.min(delta, 0.05);
-    const next = advance(c.pos, c.vel, c.input, c.fast, dt);
+    const cs = Math.cos(c.camYaw), sn = Math.sin(c.camYaw);
+    const world = { x: c.input.x * cs + c.input.y * sn, y: -c.input.x * sn + c.input.y * cs };
+    const next = advance(c.pos, c.vel, world, c.fast, dt);
     c.vel = next.velocity;
     c.pos = clampToRoom({ x: next.position.x, y: next.position.y });
     const speed = Math.hypot(c.vel.x, c.vel.y);
-    if (speed > 15) { const target = Math.atan2(c.vel.x, c.vel.y); c.yaw += Math.atan2(Math.sin(target - c.yaw), Math.cos(target - c.yaw)) * (1 - Math.exp(-turnRate(c.sens) * dt)); }
+    if (speed > 15) { const target = Math.atan2(c.vel.x, c.vel.y); c.yaw += Math.atan2(Math.sin(target - c.yaw), Math.cos(target - c.yaw)) * (1 - Math.exp(-TURN * dt)); }
     const g = group.current!;
     g.position.set(c.pos.x * UNIT, 0, c.pos.y * UNIT);
     g.rotation.y = c.yaw;
@@ -47,8 +50,8 @@ function Avatar({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
     const tx = g.position.x, tz = g.position.z;
     const portrait = state.size.height > state.size.width;
     const back = portrait ? 3.6 : 2.6;
-    cam.position.lerp(new THREE.Vector3(tx + 1.2 * back / 3.6, portrait ? 2.2 : 1.8, tz + back), 1 - Math.exp(-4 * dt));
-    cam.lookAt(tx - 0.3, 0.95, tz - 0.4);
+    cam.position.lerp(new THREE.Vector3(tx + Math.sin(c.camYaw) * back, portrait ? 2.2 : 1.8, tz + Math.cos(c.camYaw) * back), 1 - Math.exp(-8 * dt));
+    cam.lookAt(tx - Math.sin(c.camYaw) * 0.4, 0.95, tz - Math.cos(c.camYaw) * 0.4);
     const host = state.gl.domElement.parentElement;
     host?.setAttribute("data-scene-ready", "1");
     host?.setAttribute("data-pos", `${c.pos.x.toFixed(1)},${c.pos.y.toFixed(1)}`);
@@ -105,32 +108,15 @@ function Room() {
 }
 
 export function CafeScene() {
-  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 120, y: 260 }, vel: { x: 0, y: 0 }, yaw: 0, sens: DEFAULT_SENSITIVITY });
+  const ctl = useRef<Ctl>({ input: { x: 0, y: 0 }, fast: false, wave: 0, pos: { x: 120, y: 260 }, vel: { x: 0, y: 0 }, yaw: 0, camYaw: 0 });
+  const look = useRef<{ id: number; x: number } | null>(null);
   const stickRef = useRef<HTMLDivElement>(null);
-  const [sensitivity, setSensitivity] = useState(DEFAULT_SENSITIVITY);
-  const [settings, setSettings] = useState(false);
-
-  useEffect(() => {
-    let raw: string | null = null;
-    try { raw = localStorage.getItem(SENS_KEY); } catch { raw = null; }
-    const stored = clampSensitivity(raw === null ? DEFAULT_SENSITIVITY : Number(raw));
-    ctl.current.sens = stored;
-    setSensitivity(stored);
-  }, []);
-
-  function changeSensitivity(next: number) {
-    const value = clampSensitivity(next);
-    ctl.current.sens = value;
-    setSensitivity(value);
-    try { localStorage.setItem(SENS_KEY, String(value)); } catch { /* storage unavailable: keep this session's value */ }
-  }
-
   useEffect(() => {
     const keys = new Set<string>();
     const sync = () => {
       const x = Number(keys.has("KeyD") || keys.has("ArrowRight")) - Number(keys.has("KeyA") || keys.has("ArrowLeft"));
       const y = Number(keys.has("KeyS") || keys.has("ArrowDown")) - Number(keys.has("KeyW") || keys.has("ArrowUp"));
-      ctl.current.input = analogInput(scaleInput({ x, y }, ctl.current.sens));
+      ctl.current.input = analogInput({ x, y });
       ctl.current.fast = keys.has("ShiftLeft") || keys.has("ShiftRight");
     };
     const down = (e: KeyboardEvent) => { if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault(); if (e.code === "KeyE") ctl.current.wave = 2; keys.add(e.code); sync(); };
@@ -141,7 +127,7 @@ export function CafeScene() {
     import("nipplejs").then(({ create }) => {
       if (disposed || !stickRef.current) return;
       const j = create({ zone: stickRef.current, mode: "dynamic", size: 120, fadeTime: 120, color: { front: "var(--primary)", back: "var(--secondary)" } });
-      j.on("move", (ev) => { ctl.current.input = analogInput(scaleInput({ x: ev.data.vector.x, y: -ev.data.vector.y }, ctl.current.sens)); });
+      j.on("move", (ev) => { ctl.current.input = analogInput({ x: ev.data.vector.x, y: -ev.data.vector.y }); });
       j.on("end", () => { ctl.current.input = { x: 0, y: 0 }; });
       destroy = () => j.destroy();
     });
@@ -168,19 +154,13 @@ export function CafeScene() {
           <h1 dir="ltr" className="text-3xl font-extrabold text-primary">orbit<span className="text-accent">.</span></h1>
           <p className="mt-1 text-xs text-muted-foreground">المقهى · امشِ حول الطاولة</p>
         </div>
-        <div className="pointer-events-auto">
-          <Button variant="outline" size="icon" className="movement-settings rounded-full bg-card" aria-label="إعدادات الحركة" title="إعدادات الحركة" onClick={() => setSettings(!settings)}><Settings2 /></Button>
-        </div>
       </header>
-      {settings && <section dir="rtl" className="absolute right-5 top-24 z-20 w-64 rounded-lg border border-border bg-card p-4 shadow-soft" aria-label="إعدادات الحركة">
-        <div className="flex items-center justify-between"><h2 className="text-sm font-bold">الحركة والاتجاه</h2><Button variant="ghost" size="icon" aria-label="إغلاق الإعدادات" onClick={() => setSettings(false)}><X /></Button></div>
-        <label className="mt-3 block text-xs text-muted-foreground" htmlFor="sensitivity">حساسية السحب</label>
-        <input id="sensitivity" type="range" min="0.4" max="2" step="0.1" value={sensitivity} className="mt-2 w-full accent-primary" onChange={(event) => changeSensitivity(Number(event.target.value))} />
-        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>أهدأ</span><span>{sensitivity.toFixed(1)}×</span><span>أسرع</span></div>
-        <p className="mt-3 text-[11px] text-muted-foreground">تحكّم في مدى استجابة الشخصية للسحبة الصغيرة وفي سرعة لفّها نحو الاتجاه.</p>
-      </section>}
-      <div ref={stickRef} className="absolute inset-0 touch-none" aria-label="المس أي مكان واسحب للمشي" />
-      <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-muted-foreground">المس أي مكان واسحب للمشي</p>
+      <div ref={stickRef} className="absolute inset-y-0 left-0 w-1/2 touch-none" aria-label="اسحب هنا للمشي" />
+      <div className="absolute inset-y-0 right-0 w-1/2 touch-none" aria-label="اسحب هنا لتدوير الاتجاه"
+        onPointerDown={(e) => { look.current = { id: e.pointerId, x: e.clientX }; e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerMove={(e) => { const l = look.current; if (!l || l.id !== e.pointerId) return; ctl.current.camYaw -= (e.clientX - l.x) * LOOK_SPEED; l.x = e.clientX; }}
+        onPointerUp={() => { look.current = null; }} onPointerCancel={() => { look.current = null; }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-around text-xs text-muted-foreground"><span>⬅ يسار: اسحب للمشي</span><span>يمين: اسحب للالتفات ➡</span></div>
       <Button variant="outline" className="movement-actions absolute bottom-8 right-6 z-10 h-14 w-14 rounded-full border-2 bg-card text-primary" aria-label="تلويح" onClick={() => { ctl.current.wave = 2; }}><Hand className="size-6" /></Button>
     </div>
   );
